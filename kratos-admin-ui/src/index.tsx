@@ -11,6 +11,9 @@ import FooterComponent from "./components/footer/footer";
 import "./index.scss";
 import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import { MessageBarComponent } from "./components/messages/messagebar";
+import { LoginComponent } from "./components/auth/login";
+import { PrivateRoute } from "./components/auth/private-route";
+import { AuthService } from "./service/auth-service";
 
 const IdentitiesSite = React.lazy(() => import("./sites/identities/identies"));
 const CreateIdentitySite = React.lazy(
@@ -36,24 +39,30 @@ root.render(
             <MessageBarComponent></MessageBarComponent>
             <Suspense fallback={<div> Loading...</div>}>
               <Switch>
-                <Route path="/identities/create">
-                  <CreateIdentitySite />
+                <Route path="/login">
+                  {AuthService.isAuthenticated() ? (
+                    <Redirect to="/identities" />
+                  ) : (
+                    <LoginComponent />
+                  )}
                 </Route>
-                <Route path="/identities/:id/view">
-                  <ViewIdentitySite />
-                </Route>
-                <Route path="/identities/:id/edit">
-                  <EditIdentitySite />
-                </Route>
-                <Route path="/identities">
-                  <IdentitiesSite />
-                </Route>
-                <Route path="/overview">
-                  <OverviewSite />
-                </Route>
+                <PrivateRoute
+                  path="/identities/create"
+                  component={CreateIdentitySite}
+                />
+                <PrivateRoute
+                  path="/identities/:id/view"
+                  component={ViewIdentitySite}
+                />
+                <PrivateRoute
+                  path="/identities/:id/edit"
+                  component={EditIdentitySite}
+                />
+                <PrivateRoute path="/identities" component={IdentitiesSite} />
+                <PrivateRoute path="/overview" component={OverviewSite} />
                 <Redirect
                   from="*"
-                  to="/identities"
+                  to={AuthService.isAuthenticated() ? "/identities" : "/login"}
                 />
               </Switch>
             </Suspense>

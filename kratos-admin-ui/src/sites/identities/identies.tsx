@@ -19,6 +19,10 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Checkbox,
+  Field,
+  Dropdown,
+  Option,
 } from "@fluentui/react-components";
 import { Identity, IdentityApi } from "@ory/kratos-client";
 import React from "react";
@@ -31,6 +35,7 @@ import {
   DeleteRegular,
   MailRegular,
   NewRegular,
+  FilterRegular,
 } from "@fluentui/react-icons";
 import { MessageService } from "../../components/messages/messagebar";
 
@@ -48,6 +53,9 @@ interface IdentitiesState {
   selectedRows: TableRowId[];
   searchQuery: string;
   showDeleteDialog: boolean;
+  showAdvancedSearch: boolean;
+  useRegex: boolean;
+  searchField: "all" | "id" | "state" | "schema" | "email";
 }
 
 interface IdentityTableItem {
@@ -113,6 +121,9 @@ class IdentitiesSite extends React.Component<any, IdentitiesState> {
     selectedRows: [],
     searchQuery: "",
     showDeleteDialog: false,
+    showAdvancedSearch: false,
+    useRegex: false,
+    searchField: "all",
   };
 
   private api: IdentityApi | undefined;
@@ -234,11 +245,11 @@ class IdentitiesSite extends React.Component<any, IdentitiesState> {
   }
 
   private handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const searchQuery = e.target.value.toLowerCase();
+    const searchQuery = e.target.value;
     this.setState((prevState) => ({
       searchQuery,
       displayedItems: searchQuery
-        ? this.filterItems(prevState.tableItems, searchQuery)
+        ? this.filterItems(prevState.tableItems, searchQuery, prevState.useRegex, prevState.searchField)
         : prevState.tableItems,
     }));
   };
@@ -246,14 +257,93 @@ class IdentitiesSite extends React.Component<any, IdentitiesState> {
   private filterItems = (
     items: IdentityTableItem[],
     query: string,
+    useRegex: boolean,
+    searchField: "all" | "id" | "state" | "schema" | "email",
   ): IdentityTableItem[] => {
-    const lowerQuery = query.toLowerCase();
-    return items.filter(
-      (item) =>
-        item.id.toLowerCase().includes(lowerQuery) ||
-        item.state.toLowerCase().includes(lowerQuery) ||
-        item.schema.toLowerCase().includes(lowerQuery) ||
-        item.verifiable_addresses.toLowerCase().includes(lowerQuery),
+    if (!query) return items;
+
+    try {
+      if (useRegex) {
+        const regex = new RegExp(query, "i");
+        return items.filter((item) => {
+          if (searchField === "all") {
+            return (
+              regex.test(item.id) ||
+              regex.test(item.state) ||
+              regex.test(item.schema) ||
+              regex.test(item.verifiable_addresses)
+            );
+          } else if (searchField === "id") {
+            return regex.test(item.id);
+          } else if (searchField === "state") {
+            return regex.test(item.state);
+          } else if (searchField === "schema") {
+            return regex.test(item.schema);
+          } else if (searchField === "email") {
+            return regex.test(item.verifiable_addresses);
+          }
+          return false;
+        });
+      } else {
+        const lowerQuery = query.toLowerCase();
+        return items.filter((item) => {
+          if (searchField === "all") {
+            return (
+              item.id.toLowerCase().includes(lowerQuery) ||
+              item.state.toLowerCase().includes(lowerQuery) ||
+              item.schema.toLowerCase().includes(lowerQuery) ||
+              item.verifiable_addresses.toLowerCase().includes(lowerQuery)
+            );
+          } else if (searchField === "id") {
+            return item.id.toLowerCase().includes(lowerQuery);
+          } else if (searchField === "state") {
+            return item.state.toLowerCase().includes(lowerQuery);
+          } else if (searchField === "schema") {
+            return item.schema.toLowerCase().includes(lowerQuery);
+          } else if (searchField === "email") {
+            return item.verifiable_addresses.toLowerCase().includes(lowerQuery);
+          }
+          return false;
+        });
+      }
+    } catch (error) {
+      // Invalid regex, fallback to simple search
+      const lowerQuery = query.toLowerCase();
+      return items.filter(
+        (item) =>
+          item.id.toLowerCase().includes(lowerQuery) ||
+          item.state.toLowerCase().includes(lowerQuery) ||
+          item.schema.toLowerCase().includes(lowerQuery) ||
+          item.verifiable_addresses.toLowerCase().includes(lowerQuery),
+      );
+    }
+  };
+
+  private toggleAdvancedSearch = () => {
+    this.setState((prevState) => ({
+      showAdvancedSearch: !prevState.showAdvancedSearch,
+    }));
+  };
+
+  private handleRegexChange = (checked: boolean) => {
+    this.setState(
+      (prevState) => ({
+        useRegex: checked,
+        displayedItems: prevState.searchQuery
+          ? this.filterItems(prevState.tableItems, prevState.searchQuery, checked, prevState.searchField)
+          : prevState.tableItems,
+      }),
+    );
+  };
+
+  private handleSearchFieldChange = (field: "all" | "id" | "state" | "schema" | "email") => {
+    this.setState(
+      (prevState) => ({
+        searchField: field,
+        displayedItems: prevState.searchQuery
+          ? this.filterItems(prevState.tableItems, prevState.searchQuery, prevState.useRegex, field)
+          : prevState.tableItems,
+      }),
     );
   };
 
@@ -366,16 +456,69 @@ class IdentitiesSite extends React.Component<any, IdentitiesState> {
                   );
                 })}
               </div>
-              <div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <Input
                   placeholder="Search ..."
                   value={this.state.searchQuery}
                   onChange={this.handleSearchChange}
+                  style={{ width: 300 }}
                 />
+                <ToolbarButton
+                  icon={<FilterRegular />}
+                  onClick={this.toggleAdvancedSearch}
+                  appearance={this.state.showAdvancedSearch ? "primary" : "subtle"}>
+                  Advanced
+                </ToolbarButton>
               </div>
             </div>
           </Toolbar>
         </div>
+
+        {this.state.showAdvancedSearch && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: 15,
+              backgroundColor: "var(--colorNeutralBackground2)",
+              borderRadius: 4,
+              border: "1px solid var(--colorNeutralStroke1)",
+            }}>
+            <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+              <Field label="Search in">
+                <Dropdown
+                  value={this.state.searchField}
+                  onOptionSelect={(e, data) => {
+                    if (data.optionValue) {
+                      this.handleSearchFieldChange(
+                        data.optionValue as
+                          | "all"
+                          | "id"
+                          | "state"
+                          | "schema"
+                          | "email",
+                      );
+                    }
+                  }}>
+                  <Option value="all">All Fields</Option>
+                  <Option value="id">ID</Option>
+                  <Option value="state">State</Option>
+                  <Option value="schema">Schema</Option>
+                  <Option value="email">Email</Option>
+                </Dropdown>
+              </Field>
+              <Checkbox
+                label="Use Regular Expression"
+                checked={this.state.useRegex}
+                onChange={(e, data) => this.handleRegexChange(data.checked || false)}
+              />
+              {this.state.useRegex && (
+                <span style={{ fontSize: 12, color: "var(--colorNeutralForeground3)" }}>
+                  Example: ^[a-z]+@example\.com$ (case-insensitive)
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         <DataGrid
           selectionMode="multiselect"

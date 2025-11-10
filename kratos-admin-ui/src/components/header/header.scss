@@ -3,6 +3,9 @@ header {
   min-height: 56px;
   width: 100%;
   box-shadow: rgba(0, 0, 0, 0.06) 0px 2px 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 
   span {
     margin-left: 30px;
@@ -11,9 +14,13 @@ header {
     color: white;
     font-weight: 200;
   }
+
+  .header-actions {
+    margin-right: 30px;
+  }
 }
 
-header:hover {
+header span:hover {
   cursor: pointer;
   text-decoration: none;
 }
